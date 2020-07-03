@@ -1,0 +1,11 @@
+@mixin highlighting($weight, $fz){
+  font-weight: $weight;
+  color: $activeWhite;
+  font-size: $fz;
+}
+
+// border mixin
+
+@mixin changedBorder($where){
+  border-#{$where}: 3px solid $purpp;
+}

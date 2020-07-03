@@ -1,0 +1,14 @@
+%flex-between{
+  display: flex;
+  justify-content: space-between;
+}
+%list-drop{
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+%grid-todo{
+  display: grid;
+  grid-template-columns: 100px 1fr 88px;
+  grid-column-gap: 10%;
+}
