@@ -1,10 +1,10 @@
 <template>
     <div class="wrap_todo">
         <div class="wrap_date" v-if="pickedDay.length">
-            <span>To-do list on {{ months[pickedDay[0]] || months[dataNow.getMonth()]}} {{ pickedDay[1] || dataNow.getDate()}} {{ daysName[pickedDay[2] - 1] || daysName[dataNow.getDay() - 1]}}</span> <span>{{ pickedDay[3] || dataNow.getFullYear()}}</span>
+            <span>To-do list on {{ months[pickedDay[0]] || months[dataNow.getMonth()]}} {{ pickedDay[1] || dataNow.getDate()}} {{ daysName[pickedDay[2] - 1] || dataNow.getDay() === 0 ? daysName[6] : daysName[dataNow.getDay() - 1]}}</span> <span>{{ pickedDay[3] || dataNow.getFullYear()}}</span>
         </div>
         <div class="wrap_date" v-else>
-            <span>To-do list on {{ months[dataNow.getMonth()] }} {{ dataNow.getDate()}} {{ daysName[dataNow.getDay() - 1] }}</span> <span>{{ dataNow.getFullYear()}}</span>
+            <span>To-do list on {{ months[dataNow.getMonth()] }} {{ dataNow.getDate()}} {{ dataNow.getDay() === 0 ? daysName[6] : daysName[dataNow.getDay() - 1] }}</span> <span>{{ dataNow.getFullYear()}}</span>
         </div>
         <form @submit.prevent="addDo" class="todo">
             <div class="todo_in">
@@ -14,29 +14,30 @@
                 <input type="text" v-model="todoAction" ref="todoText" class="todo_text">
                 <button type="submit">Add</button>
             </div>
-            <ul class="todo_out" v-if="pickedDay[4]">
-                <li v-for="(todo, i) in pickedDay[5]" :key="i">
-                    <input type="time" class="activeTime" v-bind:value="todo.time">
-                    <input type="text" v-bind:value="todo.action">
-                    <input type="checkbox" v-on:change="completeAction(i)" v-bind:ckecked="todo.completed">
+            <ul class="todo_out" data-from="from-vuex" v-if="pickedDay[4]">
+                <li v-for="(todo, i) in pickedDayData[5]" :key="i">
+                    <input type="time" class="activeTime" v-model="pickedDayData[5][i].time" v-on:focusout="changeTimeTodoOut(i, todo.time)">
+                    <input type="text" v-model="pickedDayData[5][i].action" @focusout="changeTextOut(i, todo.action)">
+                    <input type="checkbox" @change="completeActionOut(i)" v-bind:ckecked="todo.completed" v-model="pickedDayData[5][i].completed">
                 </li>
             </ul>
             <ul class="todo_out" v-if="todoData.length">
                 <li v-for="(todo, i) in todoData" :key="i">
-                    <input type="time" v-model="todoData[i].time" v-on:input="changeTime(i, todo.time)" v-bind:class="rTimeChanged ? 'activeTime' : ''">
+                    <input type="time" v-model="todoData[i].time" v-on:focusout="changeTime(i, todo.time)" v-bind:class="rTimeChanged ? 'activeTime' : ''">
                     <input type="text" v-model="todoData[i].action" v-on:focusout="changeText(i, todo.action)">
-                    <input type="checkbox" v-on:change="completeAction(i)">
+                    <input type="checkbox" @change="completeAction(i)" v-model="todoData[i].completed" v-bind:checked="todo.completed">
                 </li>
             </ul>
+            <div class="todo_clear" v-if="todoData.length || pickedDay[4]">
+                <button type="button" @click="clearDeal">Clear</button>
+            </div>
         </form>
     </div>
 </template>
 
 <script>
-    // import {mapGetters} from 'vuex'
     export default {
         name: "ToDo",
-        // props:['months','daysName','dataNow','pickedDay'],
         props:{
           months: {
               type: Array
@@ -57,15 +58,26 @@
                 todoAction: null,
                 rTimeChanged: false,
                 todoData:  [],
-                pickedDayData: this.pickedDay
+                pickedDayData: this.pickedDay || [],
+                pickedDay5: this.pickedDay[5] || null,
+                tempForDisp: (id, newValue) => {
+                    return {
+                        id,
+                        newValue
+                    }
+                }
             }
         },
         methods:{
             addDo(){
-                const dataToDo = {
+                let localStore = this.$store.getters.doList;
+                let idd = localStore.length ? localStore[localStore.length - 1][1].id : null;
+                let dataToDo = {
                     time: this.todoTime,
                     action: this.todoAction,
-                    completed: false
+                    completed: false,
+                    // id: localStore.length !== 0 ? ++id : 0
+                    id: localStore.length !== 0 ? ++idd : 0
                 };
 
                 this.todoData.push(dataToDo);
@@ -92,29 +104,97 @@
                 resultDataForStorage.push(dataForStorage, dataToDo);
                 this.$store.dispatch('createDo', resultDataForStorage);
             },
+
+            // Меня состояние даты на тру, чтобы отображались цифры при вводе нового задания (время)
             inputTime(){
                 this.rTimeChanged = true;
             },
+
             completeAction(i){
-                this.todoData[i].completed = true;
+                this.$store.dispatch('changeDoComplete', this.tempForDisp(this.todoData[i].id, this.todoData[i].completed));
             },
+
+            // Меняем комплит, которое отображается через vuex
+            completeActionOut(i){
+                this.$store.dispatch('changeDoComplete', this.tempForDisp(this.pickedDay[5][i].id, this.pickedDay[5][i].completed));
+            },
+
+            //Меняем время только что добавленное дело
             changeTime(i, newValue){
                 this.todoData[i].time = newValue;
-                this.rTimeChanged = true;
+                this.$store.dispatch('changeDoTime', this.tempForDisp(this.todoData[i].id, newValue));
             },
-            // changeTimeTodoOut(i, todo){
-            //     console.log('Before' + todo)
-            //     this.pickedDay[5][i].time = todo;
-            //     console.log('After' + todo)
-            // },
+
+            // Меняем время, которое отображается из vuex
+            changeTimeTodoOut(i, todo){
+                this.pickedDay[5][i].time = todo;
+                this.$store.dispatch('changeDoTime', this.tempForDisp(this.pickedDayData[5][i].id, todo));
+            },
+
+            // Меняем текст только что добалвенный
             changeText(i, newText){
                 this.todoData[i].action = newText;
+                this.$store.dispatch('changeDoText', this.tempForDisp(this.todoData[i].id, newText))
+            },
+
+            // Меняем текст, которое отображается из vuex
+            changeTextOut(i, newText){
+                this.pickedDay[5][i].action = newText;
+                this.$store.dispatch('changeDoText', this.tempForDisp(this.pickedDayData[5][i].id, newText));
+            },
+
+            // Очистить выбранное только что добавленное
+            clearDeal(){
+                let clearData = [];
+                if (this.todoData.length){
+                    for (let i in this.todoData){
+                        if (this.todoData[i].completed){
+                            clearData.push(this.todoData[i].id)
+                        }
+                    }
+                    for (let i in this.todoData){
+                        for (let cl in clearData){
+                            if (clearData[cl] === this.todoData[i].id){
+                                this.todoData.splice(i, 1)
+                            }
+                        }
+                    }
+                }
+                if (this.pickedDayData[4]){
+                    for (let i in this.pickedDayData[5]){
+                        if (this.pickedDayData[5][i].completed){
+                            clearData.push(this.pickedDayData[5][i].id)
+                        }
+                    }
+                    let new5 = () => {
+                        for (let cl in clearData){
+                            for (let i in this.pickedDayData[5]){
+                                if (clearData[cl] === this.pickedDayData[5][i].id){
+                                    this.pickedDayData[5].splice(i, 1)
+                                }
+                            }
+                        }
+                        return this.pickedDayData[5];
+                    }
+                    console.log(this.pickedDayData[5]);
+                    this.pickedDayData = [this.pickedDayData[0], this.pickedDayData[1], this.pickedDayData[2], this.pickedDayData[3], this.pickedDayData[4], new5()];
+                    console.log(this.pickedDayData[5]);
+                    // console.log(this.pickedDayData + ' From ToDo')
+                    // console.log(this.pickedDayData[5])
+                    // this.pickedDayData[5] = this.pickedDayData[5].filter(el => el.completed !== true);
+                    // this.pickedDayData = this.pickedDayData.map((item, i) => {
+                    //     console.log(i)
+                    // })
+
+                }
+                this.$store.dispatch('clearStorage', clearData);
             }
 
         },
         watch: {
             pickedDayData: function () {
                 this.todoData = [];
+                this.pickedDayData = this.pickedDay;
             }
         }
     }
@@ -191,6 +271,12 @@
                         }
                     }
                 }
+            }
+        }
+        .todo_clear{
+            @extend %flex-between;
+            button{
+                width: 100px;
             }
         }
     }

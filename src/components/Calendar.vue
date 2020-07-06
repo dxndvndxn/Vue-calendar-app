@@ -33,6 +33,7 @@
                       v-bind:daysName="this.daysName"
                       v-bind:dataNow="this.dataNow"
                       v-bind:pickedDay="pickedDay"
+
                 />
             </div>
         </div>
@@ -284,6 +285,8 @@
                     }
                 }
                 this.pickedDay.push(this.changeMonth, +day, dayNumber, this.getNowYear, someDo, listOfDo);
+                console.log(this.pickedDay)
+                console.log(listOfDo)
             },
 
         },
@@ -306,6 +309,7 @@
                 let someDo = false;
                 let listOfDo = [];
                 if (storageData.length){
+                    this.hi()
                     for (let i in storageData){
                         if (storageData[i][0].month === this.changeMonth && storageData[i][0].day === this.dayNow() && storageData[i][0].year === this.getNowYear){
                             someDo = true;
